@@ -6,11 +6,20 @@ Python code for the paper [Online Graph Dictionary Learning](https://arxiv.org/a
 
 *Dictionary learning is a key tool for representation learning, that explains the data as linear combination of few basic elements. Yet, this analysis is not amenable in the context of graph learning, as graphs usually belong to different metric spaces. We fill this gap by proposing a new online Graph Dictionary Learning approach, which uses the Gromov Wasserstein divergence for the data fitting term. In our work, graphs are encoded through their nodes’ pairwise relations and modeled as convex combination of graph atoms, i.e. dictionary elements, estimated thanks to an online stochastic algorithm, which operates on a dataset of unregistered graphs with potentially different number of nodes. Our approach naturally extends to labeled graphs, and is completed by a novel upper bound that can be used as a fast approximation of Gromov Wasserstein in the embedding space. We provide numerical evidences showing the interest of our approach for unsupervised embedding of graph datasets and for online graph subspace estimation and tracking.*
 
-![GDL](https://github.com/cedricvincentcuaz/GDL/tree/master/imgs/GDL_figure.pdf)
+<p align="center">
+  <img width="800" height="500" src="./imgs/GDL_figure.png">
+</p>
 
+This repository contains implementations of our methods  which led to results detailed in the numerical experiments. Namely vanilla GDL for unlabeled graphs, its extension where we simultaneously learn graphs structure and their nodes relative importance, and its extension to labeled graphs as detailed in the supplementary material of the paper.
 
-This repository contains implementations of our methods  which led to results detailed in numerical experiments. Namely vanilla GDL for unlabeled, its extension where we simultaneously learn graphs structure and their nodes distirbution, and its extension to labeled graphs as detailed in the supplementary material of the paper.
+If you find our code useful for your research please cite GDL using the following bibtex reference (new reference to come after realease of its finale version @ICML 2021):
 
+      @article{vincent2021online,
+        title={Online Graph Dictionary Learning},
+        author={Vincent-Cuaz, C{\'e}dric and Vayer, Titouan and Flamary, R{\'e}mi and Corneli, Marco and Courty, Nicolas},
+        journal={arXiv preprint arXiv:2102.06555},
+        year={2021}
+      }
 
 **Prerequisites**
 
@@ -38,21 +47,38 @@ Datasets used for unsupervised and supervised classification benchmarks are stor
       python run_GW_GDL.py -ds "imdb-b" -natoms [4,8,12,16] -satoms [17] -reg [0.0,0.001,0.01,0.1] -ep 30 -b 16 -lr 0.01 -mode "ADJ"
 
 - Experiments on toy datasets detailed in section 4.1:
-  ![3clusters](https://github.com/cedricvincentcuaz/GDL/tree/master/imgs/fig_simplex.pdf)
+  
+<p align="center">
+  <img width="600" height="275" src="./imgs/fig_simplex.png">
+</p>
 
       python run_GW_GDL.py -ds "balanced_clustertoy" -natoms [3] -satoms [6] -reg [0.0,0.001] -ep 20 -b 16 -lr 0.01 -mode "ADJ"
       
-  ![2clusters_prop](https://github.com/cedricvincentcuaz/GDL/tree/master/imgs/1D_manifold.mp4)
+<p align="center">
+  <img width="700" height="300" src="./imgs/1D_manifold.png">
+</p>
       
       python run_GW_GDL.py -ds "clustertoy2C" -natoms [2] -satoms [12] -reg [0.0] -ep 20 -b 16 -lr 0.01 -mode "ADJ"
 
 - Experiments with GDL using Fused Gromov-Wasserstein for labeled graphs:
-  
+
+
       python run_FGW_GDL.py -ds "mutag" -natoms [4] -satoms [17] -reg [0.0] -alpha [0.25,0.5] -ep 40 -b 16 -lrC 0.01 -lrA 0.01 -mode "ADJ"
 
 - Experiments with the proposed extension of GDL where we simultaneously learn atoms structure and their nodes relative importance:
+<p align="center">
+  <img width="300" height="300" src="./imgs/weighted_gdl_figure.png">
+</p>
 
       python run_GW_extendedDL.py -ds "imdb-m" -natoms [12] -satoms [10] -regC [0.0] -ep 40 -b 16 -lrC 0.01 -lrh 0.001 -mode "ADJ"
+- Online experiments have their dedicated run files with preset parameters: run_streamingTWITCH.py    &     run_streamingTRIANGLES.py
+
+<p align="center">
+  <img width="700" height="250" src="./imgs/streaming_twitch.png"> 
+</p>
+<p align="center">
+  <img width="700" height="250" src="./imgs/streaming_triangles.png">
+</p>
 
 
 **Authors**
