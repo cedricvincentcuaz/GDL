@@ -1079,9 +1079,9 @@ class Online_GW_Twitch_streaming():
         assert 'twitch_egos' in dataset_name
         self.dataset_name= dataset_name
         self.dataset_mode = dataset_mode
-        self.graph_mode = graph_mode
-        self.number_Cs = number_Cs
-        self.shape_Cs = shape_Cs
+        self.graph_mode = graph_mode # like 'ADJ' for adjacency matrices
+        self.number_Cs = number_Cs #number of atoms
+        self.shape_Cs = shape_Cs #shared number of nodes by the atoms
         
         local_path = os.path.abspath('../')
         self.data_path = local_path+'/data/%s/'%self.dataset_name
@@ -1094,7 +1094,7 @@ class Online_GW_Twitch_streaming():
         """
         np.random.seed(algo_seed)
         init_Cs = np.random.uniform(low= 10**(-15), high=1, size= (self.number_Cs,self.shape_Cs, self.shape_Cs ))
-        self.Cs = 0.5* (init_Cs + init_Cs.transpose((0,2,1))) 
+        self.Cs= 0.5* (init_Cs + init_Cs.transpose((0,2,1))) 
         
 
     def twitch_streaming_mode(self, 
@@ -1149,7 +1149,7 @@ class Online_GW_Twitch_streaming():
         verbose : Check the good evolution of the loss. The default is False.
         """
         
-        self.settings = {'number_Cs':self.number_Cs, 'shape_Cs': self.shape_Cs, 'eps':eps,'max_iter_outer':max_iter_outer,'max_iter_inner':max_iter_inner,
+        self.settings = {'number_Cs':self.number_Cs, 'shape_atoms': self.shape_Cs, 'eps':eps,'max_iter_outer':max_iter_outer,'max_iter_inner':max_iter_inner,
                          'lr_Cs':lr_Cs, 'steps':steps,'algo_seed':algo_seed,'l2_reg':l2_reg,
                          'checkpoint_steps':checkpoint_steps ,'sampler_batchsize':sampler_batchsize}
         
@@ -1165,7 +1165,7 @@ class Online_GW_Twitch_streaming():
             #tracking of dictionary state 
             self.tracked_a=[]            
             self.tracked_losses = []
-            self.tracked_Cs =[]
+            self.tracked_atoms =[]
             self.tracked_idx=[]
         hs= np.ones(self.shape_Cs)/self.shape_Cs
         self.hhs = hs[:,None].dot(hs[None,:])
@@ -1178,7 +1178,7 @@ class Online_GW_Twitch_streaming():
         print('labels_by_events:', self.labels_by_events)
         #For twitch egos each class is seen after the other > So size_sampler is just equal to sampler_batchsize / can be adapted for different scenarios
         size_sampler = len(self.labels_by_events[self.current_event])*sampler_batchsize
-        
+        print('initial size_sampler:', size_sampler)
         reload_batch = False # Flag used to load a certain amount of graphs in memory and refresh it after each graph has been used to update the dictionary 
         for i in tqdm(range(steps)):
             if i > tracking_new_event:
@@ -1197,8 +1197,9 @@ class Online_GW_Twitch_streaming():
             if (i%size_sampler ==0) or (reload_batch==True):
                 print('loading a new batch of graphs')
                 #sample stream of graphs with adequate labels
-                self.C_target, self.y = dataloader.data_streamer(self.data_path,sampler_batchsize,self.labels_by_events[self.current_event])
-                size_sampler= len(self.C_target)
+                #corresponds to a batch saved in memory which will be used iteratively (~independently) to update atoms 
+                self.graphs, self.y = dataloader.data_streamer(self.data_path,sampler_batchsize,self.labels_by_events[self.current_event])
+                size_sampler= len(self.graphs)
                 reload_batch = False
             t = np.random.choice(range(size_sampler))
             if verbose:
@@ -1217,7 +1218,7 @@ class Online_GW_Twitch_streaming():
             while (convergence_criterion >eps) and (outer_count<max_iter_outer):
                 
                 prev_loss_w = current_loss_w 
-                w,current_loss_w,saved_transport,inner_count= self.BCD_step(self.C_target[t],w, T_init=saved_transport, l2_reg=l2_reg,max_iter=max_iter_inner,eps=eps)
+                w,current_loss_w,saved_transport,inner_count= self.BCD_step(self.graphs[t],w, T_init=saved_transport, l2_reg=l2_reg,max_iter=max_iter_inner,eps=eps)
                 total_steps+=inner_count
                 if current_loss_w< best_loss_w:
                     best_w = w
@@ -1231,13 +1232,13 @@ class Online_GW_Twitch_streaming():
             self.log['loss'].append(best_loss_w)
             self.log['steps'].append(total_steps)
             
-            self.numpy_update_atoms(self.C_target[t],best_w,best_T, lr_Cs)
+            self.numpy_update_atoms(self.graphs[t],best_w,best_T, lr_Cs)
             if verbose:
                 #check new loss after update of atoms
                 sum_ws_Cs = gwu.np_sum_scaled_mat(self.Cs, best_w)
-                check_loss,_=gwu.np_GW2(self.C_target[t],sum_ws_Cs,T_star=best_T)
+                check_loss,_=gwu.np_GW2(self.graphs[t],sum_ws_Cs,T_star=best_T)
                 print('--- Sanity check / GW2 loss: ',check_loss)
-                check_loss,_=gwu.np_GW2(self.C_target[t],sum_ws_Cs)
+                check_loss,_=gwu.np_GW2(self.graphs[t],sum_ws_Cs)
                 print('--- Sanity check - NEW TRANSPORT /  GW2  loss: ',check_loss)
             
             if (((i%checkpoint_steps)==0) or (i==(steps-1))) :
@@ -1247,11 +1248,10 @@ class Online_GW_Twitch_streaming():
                 if verbose:
                     print('checkpoint labels: %s/ first label = %s / second label =%s'%(np.unique(checkpoint_label,return_counts=True), np.unique(checkpoint_label[:checkpoint_size]),np.unique(checkpoint_label[-checkpoint_size:])))
                 checkpoint_w,checkpoint_losses=self.numpy_GW_mixture_learning(checkpoint_C,l2_reg,eps=eps,max_iter= max_iter_inner)
-        
                 self.save_elements(save_settings=(not already_saved),local_step=i,checkpoint_a=checkpoint_w,checkpoint_losses=checkpoint_losses)
                 already_saved=True
                 
-    def BCD_step(self,idx, w, T_init, l2_reg,eps,max_iter, OT_loss='square_loss'):
+    def BCD_step(self,graph, w, T_init, l2_reg,eps,max_iter, OT_loss='square_loss'):
         """
         One step of the BCD algorithm to solve GW unmixing problem on a graph
         - refers to unmixing equation 2 and algorithm 1.
@@ -1264,7 +1264,6 @@ class Online_GW_Twitch_streaming():
         eps : precision to stop our learning process based on relative variation of the loss
         max_iter : maximum number of iterations for the Conditional Gradient algorithm on {wk}
         """
-        graph= self.graphs[idx]
         sum_ws_Cs = gwu.np_sum_scaled_mat(self.Cs, w)
         #Solve GW(Ck, \sum_s wk_s C_s)
         local_GW_loss,OT = gwu.np_GW2(graph,sum_ws_Cs,T_init=T_init)
@@ -1279,16 +1278,16 @@ class Online_GW_Twitch_streaming():
         #Conditional gradient over wk given Tk
         while (convergence_criterion> eps) and (local_count<max_iter):
             prev_criterion=curr_criterion
-            grad_w = np.zeros(self.number_atoms)
-            for s in range(self.number_atoms):
+            grad_w = np.zeros(self.number_Cs)
+            for s in range(self.number_Cs):
                 grad_w[s] = np.sum(self.Cs[s]*sum_ws_Cs*self.hhs - self.Cs[s]*TCT)
                 grad_w[s] -= l2_reg*w[s]
                 grad_w[s]*=2
             # Gradient direction : x= argmin_x x^T.grad_w
-            x= np.zeros(self.number_atoms)
+            x= np.zeros(self.number_Cs)
             sorted_idx = np.argsort(grad_w)#ascending order
             pos=0
-            while (pos<self.number_atoms) and (grad_w[sorted_idx[pos]] == grad_w[sorted_idx[0]]) :
+            while (pos<self.number_Cs) and (grad_w[sorted_idx[pos]] == grad_w[sorted_idx[0]]) :
                 x[sorted_idx[pos]] = 1
                 pos+=1
             x/= pos
@@ -1337,54 +1336,53 @@ class Online_GW_Twitch_streaming():
     
             
     
-    def numpy_GW_mixture_learning(self,C_target,l2_reg,eps_a=10**(-5),max_iter= 1000, OT_loss ='square_loss', activation='linear',init_mode_a=1, seed=0):
+    def numpy_GW_mixture_learning(self,graphs,l2_reg,eps=10**(-5),max_iter= 1000, OT_loss = 'square_loss',seed=0):
         """
-        GW mixture learning for a given state of dictionary - on provided sample C_target
+        GW mixture learning for a given state of dictionary - on provided sample of graphs 
         """
         np.random.seed(seed)
-        T= len(C_target)
-        if init_mode_a==1:
-            a = np.ones((T,self.number_Cs))/self.number_Cs
-            tracked_best_a = a.copy()
-            tracked_best_loss = []
-        else:
-            raise 'other initialization not implemented'
-        for t in tqdm(range(T)):
+        K= len(graphs)
+        #initialize embeddings w as uniform for each graph
+        best_w = np.ones((K,self.number_Cs))/self.number_Cs
+        best_loss = np.ones(K)*np.inf
+        for k in range(K):
             saved_transport=None
-            
-            prev_loss_a = 10**(8)
-            current_loss_a = 10**(7)
-            convergence_criterion = abs(prev_loss_a - current_loss_a)/prev_loss_a
-            best_loss_a = prev_loss_a
+            w= best_w[k].copy()
+            curr_loss_w, convergence_criterion = 10**(8),np.inf
             outer_count=0
             #stacked_inner_counts =[]
-            while (convergence_criterion >eps_a) and (outer_count<max_iter):
+            while (convergence_criterion >eps) and (outer_count<max_iter):
                 outer_count+=1
-                prev_loss_a = current_loss_a
-                a[t],current_loss_a,saved_transport,inner_count = self.numpy_GW_FW_update_a_l2reg_v2(C_target[t], a[t], saved_transport, l2_reg,max_iter=max_iter,eps_a=eps_a)
+                prev_loss_w = curr_loss_w
+                w,curr_loss_w,saved_transport,inner_count =self.BCD_step(graphs[k], w, T_init=saved_transport, l2_reg=l2_reg,eps=eps,max_iter=max_iter, OT_loss='square_loss')
                 #stacked_inner_counts.append(inner_count)
-                convergence_criterion = abs(prev_loss_a - current_loss_a)/abs(prev_loss_a)
+                if prev_loss_w !=0: 
+                    convergence_criterion = abs(prev_loss_w - curr_loss_w)/abs(prev_loss_w)
+                else:
+                    convergence_criterion = abs(prev_loss_w - curr_loss_w)/abs(prev_loss_w+10**(-12))
+                
                 #print('current loss a: %s / convergence_criterion:%s'%(current_loss_a,convergence_criterion))
-                if current_loss_a < best_loss_a:
-                    tracked_best_a[t]= a[t]
-                    best_loss_a = current_loss_a
-            tracked_best_loss.append(best_loss_a)
-        return tracked_best_a, tracked_best_loss
+                if curr_loss_w < best_loss[k]:
+                    best_w[k]= w.copy()
+                    best_loss[k] = curr_loss_w
+        print('[checkpoint results] number of graphs:%s / cumulated GW reconstruction error : %s'%(K,np.sum(best_loss)))
+        return best_w, best_loss
     
-    def numpy_GW_mixture_learning_latevalidation(self,val_sampling,val_seed, batchsize_bylabel, selected_labels,l2_reg,eps_a=10**(-5),max_iter= 1000, OT_loss ='square_loss', activation='linear',init_mode_a=1, seed=0):
+    def numpy_GW_mixture_learning_latevalidation(self,val_sampling,val_seed, batchsize_bylabel, selected_labels,l2_reg,eps=10**(-5),max_iter= 1000, OT_loss ='square_loss', seed=0):
         """
         GW unmixing learning to handle the high variability of the number of nodes depending on classes. 
         """
         np.random.seed(seed)
         if val_sampling=='balanced':
-            C_target,y=dataloader.data_streamer(self.data_path,batchsize_bylabel, selected_labels,balanced_shapes=True,sampling_seed=val_seed,return_idx = False)
+            graphs,y=dataloader.data_streamer(self.data_path,batchsize_bylabel, selected_labels,balanced_shapes=True,sampling_seed=val_seed,return_idx = False)
         else:
             raise 'not implemented yet'
         n_track=len(self.tracked_Cs)
         print('len tracked Cs : %s / shape: %s'%(n_track,self.tracked_Cs[0].shape[0]))
         full_path = os.path.abspath('../')+'/%s/%s/'%(self.experiment_repo,self.experiment_name)
         np.save(full_path+'validation_y.npy', y)
-        tracked_losses= np.zeros((n_track, len(y)))
+        tracked_w = []
+        tracked_losses= []
         for pos in range(n_track):
             print('computing unmixing for checkpoint / steps = %s / pos= %s'%( self.checkpoint_iter_[pos],pos) )
             self.Cs = self.tracked_Cs[pos]
@@ -1393,37 +1391,33 @@ class Online_GW_Twitch_streaming():
             hs= np.ones(self.shape_Cs)/self.shape_Cs
             self.hhs = hs[:,None].dot(hs[None,:])
             self.diagh= np.diag(hs)
-            T= len(C_target)
-            if init_mode_a==1:
-                a = np.ones((T,self.number_Cs))/self.number_Cs
-                tracked_best_a = a.copy()
-                local_tracked_best_loss = []
-            else:
-                raise 'other initialization not implemented'
-            for t in tqdm(range(T)):
+            K= len(graphs)
+            #uniform init for unmixings
+            local_best_w = np.ones((K,self.number_Cs))/self.number_Cs
+            local_best_loss = np.ones(K)*np.inf
+            for k in tqdm(range(K)):
                 saved_transport=None
-                
-                prev_loss_a = 10**(8)
-                current_loss_a = 10**(7)
-                convergence_criterion = abs(prev_loss_a - current_loss_a)/prev_loss_a
-                best_loss_a = prev_loss_a
+                curr_loss_w, convergence_criterion = 10**(7),np.inf
+                w= local_best_w[k].copy()
                 outer_count=0
                 #stacked_inner_counts =[]
-                while (convergence_criterion >eps_a) and (outer_count<max_iter):
+                while (convergence_criterion >eps) and (outer_count<max_iter):
                     outer_count+=1
-                    prev_loss_a = current_loss_a
-                    a[t],current_loss_a,saved_transport,inner_count = self.numpy_GW_FW_update_a_l2reg_v2(C_target[t], a[t], saved_transport, l2_reg,max_iter=max_iter,eps_a=eps_a)
+                    prev_loss_w = curr_loss_w
+                    w,curr_loss_w,saved_transport,inner_count =self.BCD_step(graphs[k], w, T_init=saved_transport, l2_reg=l2_reg,eps=eps,max_iter=max_iter, OT_loss='square_loss')
                     #stacked_inner_counts.append(inner_count)
-                    convergence_criterion = abs(prev_loss_a - current_loss_a)/abs(prev_loss_a)
-                    #print('current loss a: %s / convergence_criterion:%s'%(current_loss_a,convergence_criterion))
-                    if current_loss_a < best_loss_a:
-                        tracked_best_a[t]= a[t]
-                        best_loss_a = current_loss_a
-                local_tracked_best_loss.append(best_loss_a)
-            tracked_losses[pos] = np.array(local_tracked_best_loss)
-            np.save(full_path+'validation_tracked_losses.npy', tracked_losses)
-        
-    def save_elements(self,save_settings=False,local_step=0,checkpoint_a=None,checkpoint_losses=None):
+                    if prev_loss_w !=0: 
+                        convergence_criterion = abs(prev_loss_w - curr_loss_w)/abs(prev_loss_w)
+                    else:
+                        convergence_criterion = abs(prev_loss_w - curr_loss_w)/abs(prev_loss_w+10**(-12))
+                    if curr_loss_w < local_best_loss[k]:
+                        local_best_w[k]= w.copy()
+                        local_best_loss[k] = curr_loss_w
+            tracked_w.append(local_best_w)
+            tracked_losses.append(local_best_w)
+            #np.save(full_path+'validation_tracked_losses.npy', tracked_losses)
+        return np.array(tracked_w), np.array(tracked_losses)
+    def save_elements(self,save_settings=False,local_step=0,checkpoint_w=None,checkpoint_losses=None):
         """
         saving tracked events
         """
@@ -1436,16 +1430,16 @@ class Online_GW_Twitch_streaming():
             pd.DataFrame(self.settings, index=self.settings.keys()).to_csv(path+'%s/settings'%self.experiment_name)
         
         if not self.save_chunks:
-            self.tracked_a.append(checkpoint_a)
+            self.tracked_w.append(checkpoint_w)
             self.tracked_losses.append(checkpoint_losses)
             self.tracked_Cs.append(self.Cs)
             # We save the full set of tracked elements
             np.save(path+'%s/tracked_Cs.npy'%self.experiment_name, np.array(self.tracked_Cs))
-            np.save(path+'%s/tracked_a.npy'%self.experiment_name, np.array(self.tracked_a))
+            np.save(path+'%s/tracked_w.npy'%self.experiment_name, np.array(self.tracked_w))
             np.save(path+'%s/tracked_losses.npy'%self.experiment_name, np.array(self.tracked_losses))
         else:
             np.save(path+'%s/Cs_checkpoint%s.npy'%(self.experiment_name,local_step), self.Cs)
-            np.save(path+'%s/a_checkpoint%s.npy'%(self.experiment_name,local_step), checkpoint_a)
+            np.save(path+'%s/w_checkpoint%s.npy'%(self.experiment_name,local_step), checkpoint_w)
             np.save(path+'%s/losses_checkpoint%s.npy'%(self.experiment_name,local_step), checkpoint_losses)
             
         for key in self.log.keys():

@@ -12,6 +12,19 @@ import os
 #os.environ['NUMEXPR_NUM_THREADS']=str(n_jobs)
 import GDL_GWalgo as algos_sto
 #%% settings
+"""
+WARNING:
+    - The dataset twitch_egos available here: https://snap.stanford.edu/data/twitch_ego_nets.html
+    was split by labels such that:
+        - the data repository ../data/twitch_egos/ contains 
+        subfolder label0/ and label1/
+        - each subfolder label{0,1} contains the graph of index k in the file graphk.npy
+    parsed according to the original file twitch_egos_graph_labels.txt
+
+    The result of this preprocessing is stored in ./data/twitch_egos.tar.gz
+"""
+
+
 dataset_name = 'twitch_egos'
 dataset_mode = 'full'
 number_Cs= 2
@@ -22,7 +35,7 @@ steps = 127000 #number of updates for streaming experiment (approximately the si
 event_steps = [63500] # switch class at the middle 
 checkpoint_steps = 3000 # each time steps%checkpoint steps we compute unmixings over the whole dataset for tracking
 sampler_batchsize=1000 # number of graphs stored in memory
-checkpoint_size=2000 #number of sampled graphs used to track unmixing. Changing at each checkpoint
+checkpoint_size= 2000 #number of sampled graphs used to track unmixing. Changing at each checkpoint
 eps = 10**(-5)
 max_iter_outer = 20
 max_iter_inner = 100
