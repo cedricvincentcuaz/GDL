@@ -8,21 +8,21 @@ Python code for the paper [Online Graph Dictionary Learning](http://proceedings.
 
 If you find this repository useful for your research please cite GDL using the following bibtex reference:
 
-@InProceedings{pmlr-v139-vincent-cuaz21a,
-  title = 	 {Online Graph Dictionary Learning},
-  author =       {Vincent-Cuaz, C{\'e}dric and Vayer, Titouan and Flamary, R{\'e}mi and Corneli, Marco and Courty, Nicolas},
-  booktitle = 	 {Proceedings of the 38th International Conference on Machine Learning},
-  pages = 	 {10564--10574},
-  year = 	 {2021},
-  editor = 	 {Meila, Marina and Zhang, Tong},
-  volume = 	 {139},
-  series = 	 {Proceedings of Machine Learning Research},
-  month = 	 {18--24 Jul},
-  publisher =    {PMLR},
-  pdf = 	 {http://proceedings.mlr.press/v139/vincent-cuaz21a/vincent-cuaz21a.pdf},
-  url = 	 {http://proceedings.mlr.press/v139/vincent-cuaz21a.html},
-  abstract = 	 {Dictionary learning is a key tool for representation learning, that explains the data as linear combination of few basic elements. Yet, this analysis is not amenable in the context of graph learning, as graphs usually belong to different metric spaces. We fill this gap by proposing a new online Graph Dictionary Learning approach, which uses the Gromov Wasserstein divergence for the data fitting term. In our work, graphs are encoded through their nodes’ pairwise relations and modeled as convex combination of graph atoms, i.e. dictionary elements, estimated thanks to an online stochastic algorithm, which operates on a dataset of unregistered graphs with potentially different number of nodes. Our approach naturally extends to labeled graphs, and is completed by a novel upper bound that can be used as a fast approximation of Gromov Wasserstein in the embedding space. We provide numerical evidences showing the interest of our approach for unsupervised embedding of graph datasets and for online graph subspace estimation and tracking.}
-}
+    @InProceedings{pmlr-v139-vincent-cuaz21a,
+      title = 	 {Online Graph Dictionary Learning},
+      author =       {Vincent-Cuaz, C{\'e}dric and Vayer, Titouan and Flamary, R{\'e}mi and Corneli, Marco and Courty,  Nicolas},
+      booktitle = 	 {Proceedings of the 38th International Conference on Machine Learning},
+      pages = 	 {10564--10574},
+      year = 	 {2021},
+      editor = 	 {Meila, Marina and Zhang, Tong},
+      volume = 	 {139},
+      series = 	 {Proceedings of Machine Learning Research},
+      month = 	 {18--24 Jul},
+      publisher =    {PMLR},
+      pdf = 	 {http://proceedings.mlr.press/v139/vincent-cuaz21a/vincent-cuaz21a.pdf},
+      url = 	 {http://proceedings.mlr.press/v139/vincent-cuaz21a.html},
+      abstract = 	 {Dictionary learning is a key tool for representation learning, that explains the data as linear     combination of few basic elements. Yet, this analysis is not amenable in the context of graph learning, as graphs usually   belong to different metric spaces. We fill this gap by proposing a new online Graph Dictionary Learning approach, which uses    the Gromov Wasserstein divergence for the data fitting term. In our work, graphs are encoded through their nodes’ pairwise  relations and modeled as convex combination of graph atoms, i.e. dictionary elements, estimated thanks to an online stochastic  algorithm, which operates on a dataset of unregistered graphs with potentially different number of nodes. Our approach  naturally extends to labeled graphs, and is completed by a novel upper bound that can be used as a fast approximation of Gromov     Wasserstein in the embedding space. We provide numerical evidences showing the interest of our approach for unsupervised    embedding of graph datasets and for online graph subspace estimation and tracking.}
+    }
 
 
 <p align="center">
