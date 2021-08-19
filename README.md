@@ -36,6 +36,8 @@ This repository contains implementations of our methods  which led to results de
 **Prerequisites**
 
 - python >= 3.7.7
+- pot >= 0.6.0 [POT Python Optimal Transport library](https://pythonot.github.io/)
+- cython >= 0.29.20
 - numpy >= 1.18.5
 - pandas >= 1.0.5
 - networkx >= 2.4
@@ -79,7 +81,7 @@ Datasets used for unsupervised and supervised classification benchmarks are stor
 
 - Experiments with the proposed extension of GDL where we simultaneously learn atoms structure and their nodes relative importance:
 <p align="center">
-  <img width="300" height="300" src="./imgs/weighted_gdl_figure.png">
+  <img width="700" height="300" src="./imgs/weighted_gdl_figure.png">
 </p>
 
       python run_GW_extendedDL.py -ds "imdb-m" -natoms [12] -satoms [10] -regC [0.0] -ep 40 -b 16 -lrC 0.01 -lrh 0.001 -mode "ADJ"
