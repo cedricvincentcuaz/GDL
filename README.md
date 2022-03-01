@@ -1,6 +1,7 @@
 # GDL
 Python code for the paper [Online Graph Dictionary Learning](http://proceedings.mlr.press/v139/vincent-cuaz21a.html).
 
+**NEWS**: (01/03/2022) An enhanced implementation of GDL can be found in the library [Python Optimal Transport](https://pythonot.github.io/). It is now compatible with many backends such as Numpy like the original version but also Pytorch, Tensorflow, JAX, Cuda. 
 
 <p align="center">
   <img width="800" height="500" src="./imgs/GDL_figure.png">
